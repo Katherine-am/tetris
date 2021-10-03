@@ -1,8 +1,8 @@
 // This is not a react component so react does not need to be imported
 import { useState, useCallback } from 'react';
 
-import { randomTetromino } from '../tetrominos';
-import { STAGE_WIDTH } from '../gameHelpers';
+import { TETROMINOS, randomTetromino } from '../tetrominos';
+import { STAGE_WIDTH, checkCollision } from '../gameHelpers';
 
 export const usePlayer = () => {
     // With ES6, we can use destructuring to grab two values 
@@ -12,14 +12,42 @@ export const usePlayer = () => {
     // That is, we can extract data from arrays and objects and assign them
     // to variables.
     const [player, setPlayer] = useState({
-        // setting up initial state for player
-        // position is 0, 0
-        pos: { x: 0, y: 0},
+        pos: { x: 0, y: 0 },
         // shape is random
-        tetromino: randomTetromino().shape,
+        tetromino: TETROMINOS[0].shape,
         // no way the shape has collided into anything yet
         collided: false,
     });
+
+    const rotate = (matrix, dir) => {
+        // Make the rows to become columns (transpose)
+        const rotatedTetro = matrix.map((_, index) => 
+            matrix.map(col => col[index]),
+        );
+        // Reverse each row to get a rotated matrix
+        if (dir > 0) return rotatedTetro.map(row => row.reverse());
+        return rotatedTetro.reverse();
+    };
+
+    const playerRotate = (stage, dir) => {
+        // DO NOT MUTATE STATE, make a deep clone of the player
+        const clonedPlayer = JSON.parse(JSON.stringify(player));
+        clonedPlayer.tetromino = rotate(clonedPlayer.tetromino, dir);
+
+        const pos = clonedPlayer.pos.x;
+        let offset = 1;
+        while(checkCollision(clonedPlayer, stage, { x: 0, y: 0 })) {
+            clonedPlayer.pos.x += offset;
+            offset = -(offset + (offset > 0 ? 1 : -1));
+            if (offset > clonedPlayer.tetromino[0].length) {
+                rotate(clonedPlayer.tetromino, -dir);
+                clonedPlayer.pos.x = pos;
+                return;
+            }
+        }
+
+        setPlayer(clonedPlayer);
+    };
 
     // Prior to ES6, variables had to be defined line by line
     // const playerState = useState();
@@ -27,12 +55,14 @@ export const usePlayer = () => {
     // const setPlayer = playerState[1];
 
     const updatePlayerPos = ({ x, y, collided }) => {
+        console.log(player, '<<**--- player in updatePlayerPos ---**>>');
+        
         setPlayer(prevState => ({
             ...prevState,
             pos: { x: (prevState.pos.x += x), y: (prevState.pos.y += y)},
             collided,
-        }))
-    }
+        }));
+    };
 
     const resetPlayer = useCallback(() => {
         setPlayer({
@@ -40,7 +70,7 @@ export const usePlayer = () => {
             tetromino: randomTetromino().shape,
             collided: false
         })
-    }, [])
+    }, []);
 
-    return [player, updatePlayerPos, resetPlayer];
+    return [player, updatePlayerPos, resetPlayer, playerRotate];
 }

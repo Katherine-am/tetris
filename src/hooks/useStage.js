@@ -5,8 +5,24 @@ import { createStage } from '../gameHelpers';
 export const useStage = (player, resetPlayer) => {
     // Initial state of stage is an empty stage
     const [stage, setStage] = useState(createStage());
+    const [rowsCleared, setRowsCleared] = useState(0);
 
     useEffect(() => {
+        setRowsCleared(0);
+
+        const sweepRows = newStage => 
+            newStage.reduce((accumulator, row) => {
+                // Checking if any part of the row contains a '0' which means there's
+                // an open cell and the row should not be cleared
+                if (row.findIndex(cell => cell[0] === 0) === -1) {
+                    setRowsCleared(prev => prev + 1);
+                    accumulator.unshift(new Array(newStage[0].length).fill([0, 'clear']));
+                    return accumulator;
+                }
+                accumulator.push(row);
+                return accumulator;
+            }, []);
+
         const updateStage = prevStage => {
             // first flush the stage
             const newStage = prevStage.map(row => 
@@ -25,13 +41,19 @@ export const useStage = (player, resetPlayer) => {
                 });
             });
 
+            // Then check if we collided
+            if (player.collided) {
+                resetPlayer();
+                return sweepRows(newStage);
+            }
+
             return newStage;
         };
 
         setStage(prevState => updateStage(prevState));
         // Below are the dependencies that are needed for this useEffect
         // They are used inside the useEffect which is why they have to be specified as dependencies
-    }, [player.collided, player.pos.x, player.pos.y, player.tetromino]);
+    }, [player, resetPlayer]);
 
-    return [stage, setStage];
+    return [stage, setStage, rowsCleared];
 }
